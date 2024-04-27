@@ -52,7 +52,7 @@ fn main() -> ! {
 
     let sclk = pins.gpio2.into_function::<FunctionSpi>();
     let mosi = pins.gpio3.into_function::<FunctionSpi>();
-    let cs_pin = pins.gpio16.into_push_pull_output();
+    let cs_pin = pins.gpio15.into_push_pull_output();
 
     let spi_device = pac.SPI0;
     let spi_pin_layout = (mosi, sclk);
@@ -75,7 +75,7 @@ fn main() -> ! {
 
     dds.enable().unwrap();
 
-    // dds.select_frequency(FrequencyRegister::F0).unwrap();
+    dds.select_frequency(FrequencyRegister::F0).unwrap();
 
     // Given a 25 MHz clock, this now outputs a sine wave
     // with a frequency of 440 Hz, which is a standard
