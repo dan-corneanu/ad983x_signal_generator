@@ -1,20 +1,25 @@
 [package]
 edition = "2021"
-name = "rp2040-project-template"
+name = "ad983x-signal-generator"
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
-embedded-hal = { version = "0.2.5", features = ["unproven"] }
 
 defmt = "0.3"
 defmt-rtt = "0.4"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 
 # We're using a Pico by default on this template
-rp-pico = "0.9"
+rp-pico = { git = "https://github.com/rp-rs/rp-hal-boards.git" }
+ad983x = { git = "https://github.com/eldruin/ad983x-rs.git" }
+# mcp4x = { git = "https://github.com/eldruin/mcp4x-rs.git" }
+fugit = "0.3.7"
+embedded-hal = "1.0.0"
+embedded-hal-bus = { version = "0.2.0" }
+portable-atomic = { version = "1.6.0", features = ["critical-section"] }
 
 # but you can use any BSP. Uncomment this to use the pro_micro_rp2040 BSP instead
 # sparkfun-pro-micro-rp2040 = "0.8"
