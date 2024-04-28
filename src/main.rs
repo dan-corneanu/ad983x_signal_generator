@@ -75,8 +75,6 @@ fn main() -> ! {
 
     dds.enable().unwrap();
 
-    dds.select_frequency(FrequencyRegister::F0).unwrap();
-
     // Given a 25 MHz clock, this now outputs a sine wave
     // with a frequency of 440 Hz, which is a standard
     // A4 tone.
