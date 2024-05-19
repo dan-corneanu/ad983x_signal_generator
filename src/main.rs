@@ -18,7 +18,7 @@ use bsp::hal::{
     sio::Sio,
     Spi, Watchdog,
 };
-use embedded_hal::spi::MODE_3;
+use embedded_hal::spi::MODE_2;
 use embedded_hal_bus::spi::RefCellDevice;
 
 #[entry]
@@ -72,7 +72,7 @@ fn main() -> ! {
         &mut pac.RESETS,
         sys_mckl,
         spi_baud_rate,
-        MODE_3,
+        MODE_2,
     );
     let shared_spi_bus = RefCell::new(spi);
 
@@ -86,7 +86,7 @@ fn main() -> ! {
         "The calculated frequency is: {}",
         440 * 2u64.pow(28) / (bmc_mckl.to_Hz() as u64)
     );
-    let f_out: fugit::Rate<u32, 1, 1> = 600u32.Hz();
+    let f_out: fugit::Rate<u32, 1, 1> = 440u32.Hz();
     let freqreg0: u32 = (f_out.to_Hz() as u64 * 2u64.pow(28) / (bmc_mckl.to_Hz() as u64))
         .try_into()
         .unwrap();
@@ -99,7 +99,8 @@ fn main() -> ! {
     dds.set_frequency(FrequencyRegister::F0, freqreg0).unwrap();
     dds.set_frequency(FrequencyRegister::F1, freqreg1).unwrap();
 
-    dds.set_output_waveform(ad983x::OutputWaveform::Triangle)
+    dds.select_frequency(FrequencyRegister::F0).unwrap();
+    dds.set_output_waveform(ad983x::OutputWaveform::Sinusoidal)
         .unwrap();
 
     dds.enable().unwrap();
