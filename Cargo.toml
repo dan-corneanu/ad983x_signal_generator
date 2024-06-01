@@ -20,7 +20,10 @@ fugit = "0.3.7"
 embedded-hal = "1.0.0"
 embedded-hal-bus = { version = "0.2.0" }
 portable-atomic = { version = "1.6.0", features = ["critical-section"] }
-ushell = { version = "0.3.6" }
+# ushell = { version = "0.3.6" }
+embedded-cli = { version = "0.2.1" }
+embedded-io = { version = "0.6.1" }
+ufmt = { version = "0.2.0" }
 
 # but you can use any BSP. Uncomment this to use the pro_micro_rp2040 BSP instead
 # sparkfun-pro-micro-rp2040 = "0.8"

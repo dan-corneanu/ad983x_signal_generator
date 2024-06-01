@@ -5,20 +5,16 @@ use ad983x::{Ad983x, FrequencyRegister};
 use bsp::{
     entry,
     hal::{
-        gpio::{
-            bank0::{Gpio0, Gpio1},
-            FunctionUart, Pin, PullDown,
-        },
-        uart::{DataBits, Enabled, StopBits, UartConfig, UartPeripheral},
+        uart::{DataBits, StopBits, UartConfig, UartPeripheral},
         Timer,
     },
-    pac::UART0,
 };
-use core::{cell::RefCell, fmt::Write};
-use defmt::*;
+use core::cell::RefCell;
+use defmt::info;
 use defmt_rtt as _;
+use embedded_cli::cli::CliBuilder;
 use fugit::RateExtU32;
-use ushell::{autocomplete::StaticAutocomplete, history::LRUHistory, Input, ShellError, UShell};
+use ufmt::uwrite;
 // use mcp4x::{Channel, Mcp4x};
 use panic_probe as _;
 use rp_pico as bsp;
@@ -33,15 +29,24 @@ use bsp::hal::{
 use embedded_hal::spi::MODE_2;
 use embedded_hal_bus::spi::RefCellDevice;
 
-type Serial = UartPeripheral<
-    Enabled,
-    UART0,
-    (
-        Pin<Gpio0, FunctionUart, PullDown>,
-        Pin<Gpio1, FunctionUart, PullDown>,
-    ),
->;
-type Shell = UShell<Serial, StaticAutocomplete<6>, LRUHistory<32, 4>, 32>;
+use embedded_cli::Command;
+
+#[derive(Command)]
+enum Base<'a> {
+    /// Set frequency for channel 0 or 1. Defaults to 100Hz on channel 0
+    SetFrequency {
+        frequency: Option<u32>,
+        channel: Option<u8>,
+    },
+    /// Say hello to World or someone else
+    Hello {
+        /// To whom to say hello (World by default)
+        name: Option<&'a str>,
+    },
+
+    /// Stop CLI and exit
+    Exit,
+}
 
 #[entry]
 fn main() -> ! {
@@ -52,7 +57,6 @@ fn main() -> ! {
     info!("Program start");
     let mut pac = pac::Peripherals::take().unwrap();
 
-    let core = pac::CorePeripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
     // SIO(single cycle IO)
     let sio = Sio::new(pac.SIO);
@@ -73,7 +77,6 @@ fn main() -> ! {
 
     let timer = Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
 
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
         pac.PADS_BANK0,
@@ -135,33 +138,73 @@ fn main() -> ! {
 
     // Set up UART0
     // Set up UART on GP0 and GP1 (Pico pins 1 and 2)
-    let uart_pins = (pins.gpio0.into_function(), pins.gpio1.into_function());
+    let uart_pins = (pins.gpio4.into_function(), pins.gpio5.into_function());
 
     // Need to perform clock init before using UART or it will freeze.
-    let uart = UartPeripheral::new(pac.UART0, uart_pins, &mut pac.RESETS)
+    let uart = UartPeripheral::new(pac.UART1, uart_pins, &mut pac.RESETS)
         .enable(
             UartConfig::new(9600.Hz(), DataBits::Eight, None, StopBits::One),
             clocks.peripheral_clock.freq(),
         )
         .unwrap();
-    // uart.write_full_blocking(b"Hello World!\r\n");
 
-    let autocomplete = StaticAutocomplete(["clear", "help", "off", "on", "set ", "status"]);
-    let history: LRUHistory<32, 4> = LRUHistory::default();
-    let mut shell: Shell = UShell::new(uart, autocomplete, history);
+    let (reader, writer) = uart.split();
+    writer.write_full_blocking(b"Hello World!\r\n");
 
-    shell.clear().ok();
+    let (command_buffer, history_buffer) = unsafe {
+        static mut COMMAND_BUFFER: [u8; 32] = [0; 32];
+        static mut HISTORY_BUFFER: [u8; 32] = [0; 32];
+        (COMMAND_BUFFER.as_mut(), HISTORY_BUFFER.as_mut())
+    };
+
+    let mut cli = CliBuilder::default()
+        .writer(writer)
+        .command_buffer(command_buffer)
+        .history_buffer(history_buffer)
+        .build()
+        .unwrap();
 
     loop {
-        let poll_value = shell.poll();
-        match poll_value {
-            Ok(Some(Input::Command((cmd, args)))) => {
-                shell.write_str(cmd).ok();
-            }
-            //Err(ShellError::WouldBlock) => break
-            _ => {}
-        }
-        delay.delay_ms(500);
+        let mut uart_byte: [u8; 1] = ['#' as u8; 1];
+        reader.read_full_blocking(&mut uart_byte).unwrap();
+        let _ = cli.process_byte::<Base, _>(
+            uart_byte[0],
+            &mut Base::processor(|cli, command| {
+                match command {
+                    Base::SetFrequency { frequency, channel } => {
+                        let requested_frequency = frequency.unwrap_or(100);
+                        let requested_channel = channel.unwrap_or(0);
+
+                        let freqreg_val: u32 = (requested_frequency as u64 * 2u64.pow(28)
+                            / (bmc_mckl.to_Hz() as u64))
+                            .try_into()
+                            .unwrap();
+                        let freq_register = match requested_channel {
+                            0 => FrequencyRegister::F0,
+                            _ => FrequencyRegister::F1,
+                        };
+                        uwrite!(
+                            cli.writer(),
+                            "Writing {} Hz, to channel {}",
+                            requested_frequency,
+                            requested_channel
+                        )?;
+                        dds.set_frequency(freq_register, freqreg_val).unwrap();
+                    }
+                    Base::Hello { name } => {
+                        // last write in command callback may or may not
+                        // end with newline. so both uwrite!() and uwriteln!()
+                        // will give identical results
+                        uwrite!(cli.writer(), "Hello, {}", name.unwrap_or("World"))?;
+                    }
+                    Base::Exit => {
+                        // We can write via normal function if formatting not needed
+                        cli.writer().write_str("Cli can't shutdown now")?;
+                    }
+                }
+                Ok(())
+            }),
+        );
     }
 }
 
