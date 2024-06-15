@@ -12,6 +12,7 @@ use bsp::hal::{
 use embedded_hal::spi::MODE_2;
 use embedded_hal_bus::spi::RefCellDevice;
 use fugit::{Rate, RateExtU32};
+use mcp4x::Mcp4x;
 use rp_pico as bsp;
 
 use crate::dds::Dds;
@@ -72,14 +73,37 @@ pub type DdsDevice<'a> = Ad983x<
                 >,
             ),
         >,
-        rp_pico::hal::gpio::Pin<
-            rp_pico::hal::gpio::bank0::Gpio15,
-            rp_pico::hal::gpio::FunctionSio<rp_pico::hal::gpio::SioOutput>,
-            rp_pico::hal::gpio::PullDown,
-        >,
+        DdsCsPin,
         Timer,
     >,
     Ad9833Ad9837,
+>;
+
+pub type Mcp4xDevice<'a> = Mcp4x<
+    mcp4x::interface::SpiInterface<
+        RefCellDevice<
+            'a,
+            Spi<
+                rp_pico::hal::spi::Enabled,
+                pac::SPI0,
+                (
+                    rp_pico::hal::gpio::Pin<
+                        rp_pico::hal::gpio::bank0::Gpio3,
+                        FunctionSpi,
+                        rp_pico::hal::gpio::PullDown,
+                    >,
+                    rp_pico::hal::gpio::Pin<
+                        rp_pico::hal::gpio::bank0::Gpio2,
+                        FunctionSpi,
+                        rp_pico::hal::gpio::PullDown,
+                    >,
+                ),
+            >,
+            PotCsPin,
+            Timer,
+        >,
+    >,
+    mcp4x::ic::Mcp41x,
 >;
 
 pub struct SystemConfig {
@@ -156,6 +180,7 @@ impl SystemConfig {
             spi_baud_rate,
             MODE_2,
         );
+
         let shared_spi_bus: RefCell<Spi0> = RefCell::new(spi);
 
         let pot_cs_pin: PotCsPin = pins.gpio17.into_push_pull_output();
@@ -193,7 +218,15 @@ impl<'a> Spi0Bus {
 
         let dds_spi_device = RefCellDevice::new(&self.shared_spi_bus, dds_cs_pin, timer).unwrap();
         let dds_device: DdsDevice<'a> = Ad983x::new_ad9833(dds_spi_device);
-        let dds = Dds::new(dds_device, self.bmc_mckl);
+
+        let pot_cs_pin = self.pot_cs_pin.take().unwrap();
+        let pot_spi_device = RefCellDevice::new(&self.shared_spi_bus, pot_cs_pin, timer).unwrap();
+        // !!! PROBLEM !!!
+        //  - MCP41010 uses SPI mode 0 or 3.
+        //  - AD9833   uses SPI mode 2.
+        let mcp41x_device: Mcp4xDevice<'a> = Mcp4x::new_mcp41x(pot_spi_device);
+
+        let dds = Dds::new(dds_device, mcp41x_device, self.bmc_mckl);
 
         ConfiguredSpi0Bus { dds }
     }

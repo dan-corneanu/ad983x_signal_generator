@@ -1,10 +1,12 @@
 use ad983x::FrequencyRegister;
 use fugit::Rate;
+use mcp4x::Channel;
 
-use crate::system_config::DdsDevice;
+use crate::system_config::{DdsDevice, Mcp4xDevice};
 
 pub struct Dds<'a> {
-    device: DdsDevice<'a>,
+    dds_device: DdsDevice<'a>,
+    pot_device: Mcp4xDevice<'a>,
     bmc_mckl: Rate<u32, 1, 1>,
     current_internal_frequency: u32,
     current_register: FrequencyRegister,
@@ -12,9 +14,14 @@ pub struct Dds<'a> {
 }
 
 impl<'a> Dds<'a> {
-    pub fn new(device: DdsDevice<'a>, bmc_mckl: Rate<u32, 1, 1>) -> Dds<'a> {
+    pub fn new(
+        dds_device: DdsDevice<'a>,
+        pot_device: Mcp4xDevice<'a>,
+        bmc_mckl: Rate<u32, 1, 1>,
+    ) -> Dds<'a> {
         let mut dds = Dds {
-            device,
+            dds_device,
+            pot_device,
             bmc_mckl,
             current_internal_frequency: 0u32,
             current_register: FrequencyRegister::F0,
@@ -26,25 +33,27 @@ impl<'a> Dds<'a> {
 
     fn reset(&mut self) -> () {
         self.current_internal_frequency = self.to_internal_frequency(100u32);
-        self.device.reset().unwrap();
+        self.dds_device.reset().unwrap();
 
-        self.device
+        self.dds_device
             .set_frequency(self.current_register, self.current_internal_frequency)
             .unwrap();
 
-        self.device
+        self.dds_device
             .set_frequency(FrequencyRegister::F0, self.current_internal_frequency)
             .unwrap();
-        self.device
+        self.dds_device
             .set_frequency(FrequencyRegister::F1, self.current_internal_frequency)
             .unwrap();
 
-        self.device.select_frequency(self.current_register).unwrap();
-        self.device
+        self.dds_device
+            .select_frequency(self.current_register)
+            .unwrap();
+        self.dds_device
             .set_output_waveform(self.current_output_waveform)
             .unwrap();
-
-        self.device.enable().unwrap();
+        self.pot_device.set_position(Channel::Ch0, 0xFF).unwrap();
+        self.dds_device.enable().unwrap();
     }
 
     fn to_internal_frequency(&self, frequency_hz: u32) -> u32 {
@@ -67,36 +76,42 @@ impl<'a> Dds<'a> {
 
     pub fn set_frequency(&mut self, requested_frequency_hz: u32) -> () {
         self.current_internal_frequency = self.to_internal_frequency(requested_frequency_hz);
-        self.device
+        self.dds_device
             .set_frequency(FrequencyRegister::F0, self.current_internal_frequency)
             .unwrap();
     }
 
     pub fn sine(&mut self) -> () {
         self.current_output_waveform = ad983x::OutputWaveform::Sinusoidal;
-        self.device
+        self.dds_device
             .set_output_waveform(self.current_output_waveform)
             .unwrap();
     }
 
     pub fn triangle(&mut self) -> () {
         self.current_output_waveform = ad983x::OutputWaveform::Triangle;
-        self.device
+        self.dds_device
             .set_output_waveform(self.current_output_waveform)
             .unwrap();
     }
 
     pub fn square(&mut self) -> () {
         self.current_output_waveform = ad983x::OutputWaveform::SquareMsbOfDac;
-        self.device
+        self.dds_device
             .set_output_waveform(self.current_output_waveform)
             .unwrap();
     }
 
     pub fn half_square(&mut self) -> () {
         self.current_output_waveform = ad983x::OutputWaveform::SquareMsbOfDacDiv2;
-        self.device
+        self.dds_device
             .set_output_waveform(self.current_output_waveform)
+            .unwrap();
+    }
+
+    pub fn set_volume(&mut self, requested_volume: u8) -> () {
+        self.pot_device
+            .set_position(Channel::Ch0, requested_volume)
             .unwrap();
     }
 }

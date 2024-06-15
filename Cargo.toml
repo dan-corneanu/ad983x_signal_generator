@@ -15,7 +15,7 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 # We're using a Pico by default on this template
 rp-pico = { git = "https://github.com/rp-rs/rp-hal-boards.git" }
 ad983x = { git = "https://github.com/eldruin/ad983x-rs.git" }
-# mcp4x = { git = "https://github.com/eldruin/mcp4x-rs.git" }
+mcp4x = { git = "https://github.com/dan-corneanu/mcp4x-rs.git", branch = "shared_spi_bus" }
 fugit = "0.3.7"
 embedded-hal = "1.0.0"
 embedded-hal-bus = { version = "0.2.0" }

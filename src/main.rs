@@ -22,6 +22,10 @@ enum Base<'a> {
     Frequency {
         frequency: Option<u32>,
     },
+    /// Set or read volume. Defaults to 50%.
+    Volume {
+        volume: Option<u8>,
+    },
     //// Set output to sine wave with given frequency or keep existing frequency.
     Sinusoidal {
         frequency: Option<u32>,
@@ -141,6 +145,14 @@ fn main() -> ! {
                         }
                         None => {
                             dds.half_square();
+                        }
+                    },
+                    Base::Volume { volume } => match volume {
+                        Some(volume) => {
+                            dds.set_volume(volume);
+                        }
+                        None => {
+                            dds.set_volume(50);
                         }
                     },
                 }
