@@ -11,8 +11,10 @@ use bsp::hal::{
 };
 use embedded_hal::spi::MODE_2;
 use embedded_hal_bus::spi::RefCellDevice;
-use fugit::RateExtU32;
+use fugit::{Rate, RateExtU32};
 use rp_pico as bsp;
+
+use crate::dds::Dds;
 
 type Uart1RxPin = bsp::hal::gpio::Pin<
     bsp::hal::gpio::bank0::Gpio4,
@@ -51,7 +53,7 @@ type DdsCsPin = bsp::hal::gpio::Pin<
     bsp::hal::gpio::PullDown,
 >;
 
-pub type Dds<'a> = Ad983x<
+pub type DdsDevice<'a> = Ad983x<
     RefCellDevice<
         'a,
         Spi<
@@ -91,6 +93,7 @@ pub struct SystemConfig {
 }
 
 pub struct Spi0Bus {
+    bmc_mckl: Rate<u32, 1, 1>,
     shared_spi_bus: SharedSpi0Bus,
     timer: Option<Timer>,
     pot_cs_pin: Option<PotCsPin>,
@@ -158,6 +161,7 @@ impl SystemConfig {
         let pot_cs_pin: PotCsPin = pins.gpio17.into_push_pull_output();
         let dds_cs_pin: DdsCsPin = pins.gpio15.into_push_pull_output();
         let spi0_bus: Spi0Bus = Spi0Bus {
+            bmc_mckl,
             shared_spi_bus,
             timer: Some(timer),
             pot_cs_pin: Some(pot_cs_pin),
@@ -179,6 +183,7 @@ impl SystemConfig {
 
 pub struct ConfiguredSpi0Bus<'a> {
     pub dds: Dds<'a>,
+    // pub dds: DdsDevice<'a>,
 }
 
 impl<'a> Spi0Bus {
@@ -187,8 +192,8 @@ impl<'a> Spi0Bus {
         let timer = self.timer.take().unwrap();
 
         let dds_spi_device = RefCellDevice::new(&self.shared_spi_bus, dds_cs_pin, timer).unwrap();
-        let mut dds: Dds<'a> = Ad983x::new_ad9833(dds_spi_device);
-        dds.reset().unwrap();
+        let dds_device: DdsDevice<'a> = Ad983x::new_ad9833(dds_spi_device);
+        let dds = Dds::new(dds_device, self.bmc_mckl);
 
         ConfiguredSpi0Bus { dds }
     }

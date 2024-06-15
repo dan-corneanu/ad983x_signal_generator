@@ -1,25 +1,43 @@
 #![no_std]
 #![no_main]
 
+mod dds;
 mod system_config;
 
-use ad983x::FrequencyRegister;
 use bsp::entry;
+use dds::Dds;
 use defmt::info;
 use defmt_rtt as _;
 use embedded_cli::cli::CliBuilder;
 use embedded_cli::Command;
 use panic_probe as _;
 use rp_pico as bsp;
-use system_config::{Dds, SystemConfig, Uart1Reader, Uart1Writer};
+use system_config::{SystemConfig, Uart1Reader, Uart1Writer};
 use ufmt::uwrite;
 
 #[derive(Command)]
 enum Base<'a> {
-    /// Set frequency for channel 0 or 1. Defaults to 100Hz on channel 0
-    SetFrequency {
+    /// Set or read frequency. Defaults to 100Hz. It preserves the last set
+    /// signal function.
+    Frequency {
         frequency: Option<u32>,
-        channel: Option<u8>,
+    },
+    //// Set output to sine wave with given frequency or keep existing frequency.
+    Sinusoidal {
+        frequency: Option<u32>,
+    },
+    //// Set output to a triangle wave with given frequency or keep existing frequency.
+    Triangle {
+        frequency: Option<u32>,
+    },
+    //// Set output to a square wave with given frequency or keep existing frequency.
+    Square {
+        frequency: Option<u32>,
+    },
+    //// Set output to a square wave with half of the given frequency or half of
+    ///the existing frequency.
+    SquareHalf {
+        frequency: Option<u32>,
     },
     /// Say hello to World or someone else
     Hello {
@@ -71,37 +89,60 @@ fn main() -> ! {
             uart_byte[0],
             &mut Base::processor(|cli, command| {
                 match command {
-                    Base::SetFrequency { frequency, channel } => {
-                        let requested_frequency = frequency.unwrap_or(100);
-                        let requested_channel = channel.unwrap_or(0);
-
-                        let freqreg_val: u32 = (requested_frequency as u64 * 2u64.pow(28)
-                            / (system_config.bmc_mckl.to_Hz() as u64))
-                            .try_into()
-                            .unwrap();
-                        let freq_register = match requested_channel {
-                            0 => FrequencyRegister::F0,
-                            _ => FrequencyRegister::F1,
-                        };
-
-                        let s = match freq_register {
-                            FrequencyRegister::F0 => "F0",
-                            _ => "F1",
-                        };
-
-                        uwrite!(cli.writer(), "Writing {} to register {}", freqreg_val, s)?;
-                        dds.set_frequency(freq_register, freqreg_val).unwrap();
-                    }
+                    Base::Frequency { frequency } => match frequency {
+                        Some(frequency) => {
+                            dds.set_frequency(frequency);
+                        }
+                        None => {
+                            uwrite!(
+                                cli.writer(),
+                                "Current frequency is {} Hz",
+                                dds.current_frequency_hz()
+                            )?;
+                        }
+                    },
                     Base::Hello { name } => {
-                        // last write in command callback may or may not
-                        // end with newline. so both uwrite!() and uwriteln!()
-                        // will give identical results
                         uwrite!(cli.writer(), "Hello, {}", name.unwrap_or("World"))?;
                     }
                     Base::Exit => {
-                        // We can write via normal function if formatting not needed
                         cli.writer().write_str("Cli can't shutdown now")?;
                     }
+                    Base::Sinusoidal { frequency } => match frequency {
+                        Some(frequency) => {
+                            dds.set_frequency(frequency);
+                            dds.sine();
+                        }
+                        None => {
+                            dds.sine();
+                        }
+                    },
+                    Base::Triangle { frequency } => match frequency {
+                        Some(frequency) => {
+                            dds.set_frequency(frequency);
+                            dds.triangle();
+                        }
+                        None => {
+                            dds.triangle();
+                        }
+                    },
+                    Base::Square { frequency } => match frequency {
+                        Some(frequency) => {
+                            dds.set_frequency(frequency);
+                            dds.square();
+                        }
+                        None => {
+                            dds.square();
+                        }
+                    },
+                    Base::SquareHalf { frequency } => match frequency {
+                        Some(frequency) => {
+                            dds.set_frequency(frequency);
+                            dds.half_square();
+                        }
+                        None => {
+                            dds.half_square();
+                        }
+                    },
                 }
                 Ok(())
             }),
