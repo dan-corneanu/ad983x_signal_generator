@@ -12,7 +12,6 @@ use bsp::hal::{
 use embedded_hal::spi::MODE_2;
 use embedded_hal_bus::spi::RefCellDevice;
 use fugit::{Rate, RateExtU32};
-use mcp4x::Mcp4x;
 use rp_pico as bsp;
 
 use crate::dds::Dds;
@@ -41,12 +40,6 @@ type Spi0sclkPin =
 type Spi0 = Spi<bsp::hal::spi::Enabled, pac::SPI0, (Spi0MosiPin, Spi0sclkPin)>;
 
 type SharedSpi0Bus = RefCell<Spi0>;
-
-type PotCsPin = bsp::hal::gpio::Pin<
-    bsp::hal::gpio::bank0::Gpio17,
-    bsp::hal::gpio::FunctionSio<bsp::hal::gpio::SioOutput>,
-    bsp::hal::gpio::PullDown,
->;
 
 type DdsCsPin = bsp::hal::gpio::Pin<
     bsp::hal::gpio::bank0::Gpio15,
@@ -79,33 +72,6 @@ pub type DdsDevice<'a> = Ad983x<
     Ad9833Ad9837,
 >;
 
-pub type Mcp4xDevice<'a> = Mcp4x<
-    mcp4x::interface::SpiInterface<
-        RefCellDevice<
-            'a,
-            Spi<
-                rp_pico::hal::spi::Enabled,
-                pac::SPI0,
-                (
-                    rp_pico::hal::gpio::Pin<
-                        rp_pico::hal::gpio::bank0::Gpio3,
-                        FunctionSpi,
-                        rp_pico::hal::gpio::PullDown,
-                    >,
-                    rp_pico::hal::gpio::Pin<
-                        rp_pico::hal::gpio::bank0::Gpio2,
-                        FunctionSpi,
-                        rp_pico::hal::gpio::PullDown,
-                    >,
-                ),
-            >,
-            PotCsPin,
-            Timer,
-        >,
-    >,
-    mcp4x::ic::Mcp41x,
->;
-
 pub struct SystemConfig {
     pub sys_mckl: fugit::Rate<u32, 1, 1>,
     pub bmc_mckl: fugit::Rate<u32, 1, 1>,
@@ -120,7 +86,6 @@ pub struct Spi0Bus {
     bmc_mckl: Rate<u32, 1, 1>,
     shared_spi_bus: SharedSpi0Bus,
     timer: Option<Timer>,
-    pot_cs_pin: Option<PotCsPin>,
     dds_cs_pin: Option<DdsCsPin>,
 } //
 
@@ -183,13 +148,11 @@ impl SystemConfig {
 
         let shared_spi_bus: RefCell<Spi0> = RefCell::new(spi);
 
-        let pot_cs_pin: PotCsPin = pins.gpio17.into_push_pull_output();
         let dds_cs_pin: DdsCsPin = pins.gpio15.into_push_pull_output();
         let spi0_bus: Spi0Bus = Spi0Bus {
             bmc_mckl,
             shared_spi_bus,
             timer: Some(timer),
-            pot_cs_pin: Some(pot_cs_pin),
             dds_cs_pin: Some(dds_cs_pin),
         };
 
@@ -208,7 +171,6 @@ impl SystemConfig {
 
 pub struct ConfiguredSpi0Bus<'a> {
     pub dds: Dds<'a>,
-    // pub dds: DdsDevice<'a>,
 }
 
 impl<'a> Spi0Bus {
@@ -219,14 +181,7 @@ impl<'a> Spi0Bus {
         let dds_spi_device = RefCellDevice::new(&self.shared_spi_bus, dds_cs_pin, timer).unwrap();
         let dds_device: DdsDevice<'a> = Ad983x::new_ad9833(dds_spi_device);
 
-        let pot_cs_pin = self.pot_cs_pin.take().unwrap();
-        let pot_spi_device = RefCellDevice::new(&self.shared_spi_bus, pot_cs_pin, timer).unwrap();
-        // !!! PROBLEM !!!
-        //  - MCP41010 uses SPI mode 0 or 3.
-        //  - AD9833   uses SPI mode 2.
-        let mcp41x_device: Mcp4xDevice<'a> = Mcp4x::new_mcp41x(pot_spi_device);
-
-        let dds = Dds::new(dds_device, mcp41x_device, self.bmc_mckl);
+        let dds = Dds::new(dds_device, self.bmc_mckl);
 
         ConfiguredSpi0Bus { dds }
     }

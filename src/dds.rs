@@ -1,12 +1,10 @@
 use ad983x::FrequencyRegister;
 use fugit::Rate;
-use mcp4x::Channel;
 
-use crate::system_config::{DdsDevice, Mcp4xDevice};
+use crate::system_config::DdsDevice;
 
 pub struct Dds<'a> {
     dds_device: DdsDevice<'a>,
-    pot_device: Mcp4xDevice<'a>,
     bmc_mckl: Rate<u32, 1, 1>,
     current_internal_frequency: u32,
     current_register: FrequencyRegister,
@@ -14,14 +12,9 @@ pub struct Dds<'a> {
 }
 
 impl<'a> Dds<'a> {
-    pub fn new(
-        dds_device: DdsDevice<'a>,
-        pot_device: Mcp4xDevice<'a>,
-        bmc_mckl: Rate<u32, 1, 1>,
-    ) -> Dds<'a> {
+    pub fn new(dds_device: DdsDevice<'a>, bmc_mckl: Rate<u32, 1, 1>) -> Dds<'a> {
         let mut dds = Dds {
             dds_device,
-            pot_device,
             bmc_mckl,
             current_internal_frequency: 0u32,
             current_register: FrequencyRegister::F0,
@@ -52,7 +45,6 @@ impl<'a> Dds<'a> {
         self.dds_device
             .set_output_waveform(self.current_output_waveform)
             .unwrap();
-        self.pot_device.set_position(Channel::Ch0, 0xFF).unwrap();
         self.dds_device.enable().unwrap();
     }
 
@@ -106,12 +98,6 @@ impl<'a> Dds<'a> {
         self.current_output_waveform = ad983x::OutputWaveform::SquareMsbOfDacDiv2;
         self.dds_device
             .set_output_waveform(self.current_output_waveform)
-            .unwrap();
-    }
-
-    pub fn set_volume(&mut self, requested_volume: u8) -> () {
-        self.pot_device
-            .set_position(Channel::Ch0, requested_volume)
             .unwrap();
     }
 }

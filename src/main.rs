@@ -16,15 +16,11 @@ use system_config::{SystemConfig, Uart1Reader, Uart1Writer};
 use ufmt::uwrite;
 
 #[derive(Command)]
-enum Base<'a> {
+enum Base {
     /// Set or read frequency. Defaults to 100Hz. It preserves the last set
     /// signal function.
     Frequency {
         frequency: Option<u32>,
-    },
-    /// Set or read volume. Defaults to 50%.
-    Volume {
-        volume: Option<u8>,
     },
     //// Set output to sine wave with given frequency or keep existing frequency.
     Sinusoidal {
@@ -43,12 +39,6 @@ enum Base<'a> {
     SquareHalf {
         frequency: Option<u32>,
     },
-    /// Say hello to World or someone else
-    Hello {
-        /// To whom to say hello (World by default)
-        name: Option<&'a str>,
-    },
-
     /// Stop CLI and exit
     Exit,
 }
@@ -105,9 +95,6 @@ fn main() -> ! {
                             )?;
                         }
                     },
-                    Base::Hello { name } => {
-                        uwrite!(cli.writer(), "Hello, {}", name.unwrap_or("World"))?;
-                    }
                     Base::Exit => {
                         cli.writer().write_str("Cli can't shutdown now")?;
                     }
@@ -145,14 +132,6 @@ fn main() -> ! {
                         }
                         None => {
                             dds.half_square();
-                        }
-                    },
-                    Base::Volume { volume } => match volume {
-                        Some(volume) => {
-                            dds.set_volume(volume);
-                        }
-                        None => {
-                            dds.set_volume(50);
                         }
                     },
                 }
