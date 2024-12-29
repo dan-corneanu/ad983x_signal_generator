@@ -6,20 +6,21 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 cortex-m = "0.7"
-cortex-m-rt = "0.7"
+cortex-m-rt = "0.7.5"
 
-defmt = "0.3"
+defmt = "0.3.10"
 defmt-rtt = "0.4"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 
 # We're using a Pico by default on this template
-rp-pico = { git = "https://github.com/rp-rs/rp-hal-boards.git" }
+# rp-pico = { git = "https://github.com/rp-rs/rp-hal-boards.git" }
+rp-pico = { git = "https://github.com/dan-corneanu/rp-hal-boards.git", branch = "features/update-rp2040-hal" }
 ad983x = { git = "https://github.com/eldruin/ad983x-rs.git" }
-# mcp4x = { git = "https://github.com/dan-corneanu/mcp4x-rs.git", branch = "shared_spi_bus" }
+mcp4x = { git = "https://github.com/dan-corneanu/mcp4x-rs.git", branch = "shared_spi_bus" }
 fugit = "0.3.7"
 embedded-hal = "1.0.0"
 embedded-hal-bus = { version = "0.2.0" }
-portable-atomic = { version = "1.6.0", features = ["critical-section"] }
+portable-atomic = { version = "1.10.0", features = ["critical-section"] }
 # ushell = { version = "0.3.6" }
 embedded-cli = { version = "0.2.1" }
 embedded-io = { version = "0.6.1" }

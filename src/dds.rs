@@ -1,20 +1,38 @@
 use ad983x::FrequencyRegister;
+use embedded_hal::spi::MODE_2;
+use embedded_hal::spi::MODE_3;
 use fugit::Rate;
+use mcp4x::Channel;
+use rp_pico::hal::Timer;
 
-use crate::system_config::DdsDevice;
+use crate::system_config::{DdsDevice, Mcp4xDevice, SharedSpi0Bus};
 
+#[allow(unused)]
 pub struct Dds<'a> {
+    pub timer: Timer,
+    shared_spi_bus: &'a SharedSpi0Bus,
     dds_device: DdsDevice<'a>,
+    pot_device: Mcp4xDevice<'a>,
     bmc_mckl: Rate<u32, 1, 1>,
     current_internal_frequency: u32,
     current_register: FrequencyRegister,
     current_output_waveform: ad983x::OutputWaveform,
 }
 
+#[allow(unused)]
 impl<'a> Dds<'a> {
-    pub fn new(dds_device: DdsDevice<'a>, bmc_mckl: Rate<u32, 1, 1>) -> Dds<'a> {
-        let mut dds = Dds {
+    pub fn new(
+        timer: Timer,
+        shared_spi_bus: &'a SharedSpi0Bus,
+        dds_device: DdsDevice<'a>,
+        pot_device: Mcp4xDevice<'a>,
+        bmc_mckl: Rate<u32, 1, 1>,
+    ) -> Dds<'a> {
+        let mut dds: Dds<'_> = Dds {
+            timer,
+            shared_spi_bus,
             dds_device,
+            pot_device,
             bmc_mckl,
             current_internal_frequency: 0u32,
             current_register: FrequencyRegister::F0,
@@ -99,5 +117,17 @@ impl<'a> Dds<'a> {
         self.dds_device
             .set_output_waveform(self.current_output_waveform)
             .unwrap();
+    }
+
+    pub fn set_volume(&mut self, requested_volume: u8) -> () {
+        // NOTE: MCP41010 can only use MODE_0 or MODE_3
+        self.shared_spi_bus.borrow_mut().set_format(MODE_3.into());
+
+        self.pot_device
+            .set_position(Channel::Ch0, requested_volume)
+            .unwrap();
+
+        // NOTE: Set the bus back to MODE_2 for
+        self.shared_spi_bus.borrow_mut().set_format(MODE_2.into());
     }
 }

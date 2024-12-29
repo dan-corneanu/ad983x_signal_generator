@@ -10,6 +10,7 @@ use defmt::info;
 use defmt_rtt as _;
 use embedded_cli::cli::CliBuilder;
 use embedded_cli::Command;
+// use embedded_hal::delay::DelayNs;
 use panic_probe as _;
 use rp_pico as bsp;
 use system_config::{SystemConfig, Uart1Reader, Uart1Writer};
@@ -54,7 +55,6 @@ fn main() -> ! {
     );
 
     let spi0_bus = system_config.spi0_bus.configure();
-    // let mut pot = spi0_bus.pot;
     let mut dds: Dds = spi0_bus.dds;
 
     let writer: Uart1Writer = system_config.writer;
@@ -75,7 +75,32 @@ fn main() -> ! {
         .build()
         .unwrap();
 
-    info!("Program running ...");
+    // info!("Program running ...");
+
+    // dds.sine();
+    // dds.set_frequency(600000u32);
+    // dds.timer.delay_ms(1000);
+
+    // dds.set_volume(250);
+    // dds.timer.delay_ms(1000);
+
+    // dds.set_frequency(800000u32);
+    // dds.timer.delay_ms(1000);
+
+    // dds.set_volume(120);
+    // dds.timer.delay_ms(1000);
+
+    // dds.triangle();
+    // dds.timer.delay_ms(1000);
+
+    // dds.half_square();
+    // dds.timer.delay_ms(1000);
+
+    // dds.set_volume(50);
+    // dds.timer.delay_ms(1000);
+
+    // dds.set_frequency(100000u32);
+
     loop {
         let mut uart_byte: [u8; 1] = ['#' as u8; 1];
         reader.read_full_blocking(&mut uart_byte).unwrap();
